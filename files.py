@@ -29,6 +29,7 @@ class CCFile:
     relative_path: Path
     file_name: str
     file_type: CCType
+    file_size_bytes: int
 
 
 def find_cc_files(directory: Path) -> Generator[CCFile, None, None]:
@@ -48,6 +49,7 @@ def find_cc_files(directory: Path) -> Generator[CCFile, None, None]:
                 relative_path=file_path.relative_to(directory),
                 file_name=file,
                 file_type=file_type,
+                file_size_bytes=file_path.stat().st_size,
             )
 
 

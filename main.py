@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from argparse import ArgumentParser
 from pathlib import Path
 
@@ -8,13 +10,39 @@ from validators.ts4script_validator import TS4ScriptValidator
 
 
 def main():
+    logger = LogHandler.get_logger(__name__)
+
     # for root, subdirs, files in os.walk()
     parser = ArgumentParser(description="Package Checker")
     parser.add_argument("-d", "--directory", type=Path, help="Directory to check")
     parser.add_argument("-o", "--outdir", type=Path, help="Output directory")
+    parser.add_argument(
+        "-s",
+        "--skip",
+        type=str,
+        action="append",
+        choices=[t.value for t in CCType],
+        required=False,
+        help="Skip validation for specific file types",
+    )
+    parser.add_argument(
+        "-S",
+        "--dont-write-skipped",
+        action="store_true",
+        dest="dont_write_skipped",
+        help="Don't write skipped files to output directory",
+    )
+    parser.add_argument(
+        "-t",
+        "--dry-run",
+        action="store_true",
+        dest="dry_run",
+        help="Don't write any files to output directory",
+    )
     args = parser.parse_args()
+    if args.skip:
+        logger.info(f"Skipping validation for {args.skip}")
 
-    logger = LogHandler.get_logger(__name__)
     package_validator = SimsPackageValidator(logger)
     ts4cript_validator = TS4ScriptValidator(logger)
 
@@ -29,14 +57,17 @@ def main():
     for cc_file in find_cc_files(args.directory):
         file_stats[cc_file.file_type] += 1
         validator = validator_map.get(cc_file.file_type)
-        if validator and (error := validator.validate(cc_file)):
+        should_skip = str(cc_file.file_type) in args.skip
+        if validator and not should_skip and (error := validator.validate(cc_file)):
             logger.error(f"Validation error for {cc_file.file_name}: {error}")
             validity_stats["corrupted"] += 1
             continue
         else:
             validity_stats["valid"] += 1
             logger.info(f"Validated {cc_file.file_name}")
-            # write_file_to_output(package_file, args.outdir)
+            if args.dry_run or (should_skip and args.dont_write_skipped):
+                continue
+            write_file_to_output(cc_file, args.outdir)
 
     logger.info(f"Validated {validity_stats['valid']} cc files")
     logger.info(f"Found {validity_stats['corrupted']} corrupted cc files")
