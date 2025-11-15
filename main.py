@@ -3,7 +3,7 @@ from pathlib import Path
 
 from files import find_package_files
 from log_handler import LogHandler
-from package_validator import SimsPackageValidator
+from validators.package_validator import SimsPackageValidator
 
 
 def main():

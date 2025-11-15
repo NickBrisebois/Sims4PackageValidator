@@ -1,17 +1,10 @@
 import struct
-from dataclasses import _MISSING_TYPE, dataclass
+from dataclasses import dataclass
 from enum import Enum
 from logging import Logger
-from multiprocessing import Value
-from pathlib import Path
 
-import magic_package_values as magic
-
-
-@dataclass
-class PackageFile:
-    file_path: Path
-    file_name: str
+import validators.magic_package_values as magic
+from files import PackageFile
 
 
 class ValidationError(Enum):

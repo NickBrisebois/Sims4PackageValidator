@@ -1,8 +1,8 @@
 [project]
 name = "packagechecker"
-author = "Nick Brisebois<email@nick-b.ca>"
+author = "Nick Brisebois <email@nick-b.ca>"
 version = "0.1.0"
-description = "Check if Sims 4 packages are corrupted or not"
+description = "Check if Sims 4 CC files are corrupted or not"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
