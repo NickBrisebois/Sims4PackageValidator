@@ -3,8 +3,9 @@ from dataclasses import dataclass
 from enum import Enum
 from logging import Logger
 
-import validators.magic_package_values as magic
+import validators.magic_numbers.packages as magic
 from files import PackageFile
+from validators.base_validator import BaseValidator
 
 
 class ValidationError(Enum):
@@ -48,7 +49,7 @@ class PackageException(Exception):
         self.error = error
 
 
-class SimsPackageValidator:
+class SimsPackageValidator(BaseValidator):
     _logger: Logger
 
     def __init__(self, logger: Logger):

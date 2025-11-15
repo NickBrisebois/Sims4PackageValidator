@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Generator
 
 PACKAGE_EXTENSIONS = (".package",)
-SCRIPT_EXTENSIONS = (".t4script",)
+SCRIPT_EXTENSIONS = (".ts4script",)
 IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".gif")
 
 

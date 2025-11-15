@@ -1,9 +1,10 @@
 from argparse import ArgumentParser
 from pathlib import Path
 
-from files import find_package_files
+from files import CCType, find_package_files
 from log_handler import LogHandler
 from validators.package_validator import SimsPackageValidator
+from validators.ts4script_validator import TS4ScriptValidator
 
 
 def main():
@@ -15,20 +16,32 @@ def main():
 
     logger = LogHandler.get_logger(__name__)
     package_validator = SimsPackageValidator(logger)
+    ts4cript_validator = TS4ScriptValidator(logger)
 
-    corrupted = 0
-    valid = 0
+    validity_stats = {"corrupted": 0, "valid": 0}
+    file_stats = {CCType.SCRIPT: 0, CCType.PACKAGE: 0, CCType.IMAGE: 0}
+
+    validator_map = {
+        CCType.PACKAGE: package_validator,
+        CCType.SCRIPT: ts4cript_validator,
+    }
 
     for package_file in find_package_files(args.directory):
-        if error := package_validator.validate(package_file):
-            logger.error(f"Validation error for {package_file}: {error}")
-            corrupted += 1
+        file_stats[package_file.file_type] += 1
+        validator = validator_map.get(package_file.file_type)
+        if validator and (error := validator.validate(package_file)):
+            logger.error(f"Validation error for {package_file.file_name}: {error}")
+            validity_stats["corrupted"] += 1
+            continue
         else:
-            valid += 1
-            logger.info(f"Validated {package_file}")
+            validity_stats["valid"] += 1
+            logger.info(f"Validated {package_file.file_name}")
 
-    logger.info(f"Validated {valid} packages")
-    logger.info(f"Found {corrupted} corrupted packages")
+    logger.info(f"Validated {validity_stats['valid']} packages")
+    logger.info(f"Found {validity_stats['corrupted']} corrupted packages")
+    logger.info(f"Found {file_stats[CCType.SCRIPT]} TS4Script files")
+    logger.info(f"Found {file_stats[CCType.PACKAGE]} SimsPackage files")
+    logger.info(f"Found {file_stats[CCType.IMAGE]} image files")
 
 
 if __name__ == "__main__":
