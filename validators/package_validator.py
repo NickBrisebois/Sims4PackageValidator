@@ -4,7 +4,7 @@ from enum import Enum
 from logging import Logger
 
 import validators.magic_numbers.packages as magic
-from files import PackageFile
+from files import CCFile
 from validators.base_validator import BaseValidator
 
 
@@ -55,7 +55,7 @@ class SimsPackageValidator(BaseValidator):
     def __init__(self, logger: Logger):
         self._logger = logger
 
-    def _verify_file_meta(self, package_file: PackageFile) -> None:
+    def _verify_file_meta(self, package_file: CCFile) -> None:
         """
         Just make sure we're working on a real file
         """
@@ -133,7 +133,7 @@ class SimsPackageValidator(BaseValidator):
             unknown_four=unknown_four,
         )
 
-    def validate(self, package_file: PackageFile):
+    def validate(self, package_file: CCFile):
         try:
             self._verify_file_meta(package_file)
 

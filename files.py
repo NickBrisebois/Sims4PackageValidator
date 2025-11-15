@@ -10,9 +10,10 @@ IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".gif")
 
 
 class CCType(Enum):
-    PACKAGE = "package"
-    SCRIPT = "script"
-    IMAGE = "image"
+    PACKAGE = "PACKAGE"
+    SCRIPT = "SCRIPT"
+    IMAGE = "IMAGE"
+    OTHER = "OTHER"
 
 
 MAPPING = {
@@ -23,22 +24,34 @@ MAPPING = {
 
 
 @dataclass
-class PackageFile:
+class CCFile:
     file_path: Path
+    relative_path: Path
     file_name: str
     file_type: CCType
 
 
-def find_package_files(directory: Path) -> Generator[PackageFile, None, None]:
+def find_cc_files(directory: Path) -> Generator[CCFile, None, None]:
     for root, subdirs, files in os.walk(directory, topdown=True):
         for subdir in subdirs:
-            yield from find_package_files(Path(subdir))
+            yield from find_cc_files(Path(subdir))
 
         for file in files:
+            file_type = CCType.OTHER
             for ext, type in MAPPING.items():
                 if file.endswith(ext):
-                    yield PackageFile(
-                        file_path=Path(root) / file,
-                        file_name=file,
-                        file_type=type,
-                    )
+                    file_type = type
+
+            file_path = Path(root) / file
+            yield CCFile(
+                file_path=file_path,
+                relative_path=file_path.relative_to(directory),
+                file_name=file,
+                file_type=file_type,
+            )
+
+
+def write_file_to_output(cc_file: CCFile, output_dir: Path):
+    output_path = output_dir / cc_file.relative_path
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_bytes(cc_file.file_path.read_bytes())
