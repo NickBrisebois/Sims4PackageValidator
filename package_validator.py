@@ -18,7 +18,8 @@ class ValidationError(Enum):
     # Common meta file errors
     FILE_TOO_SMALL = "FILE_TOO_SMALL"
 
-    MISSING_FILE_IDENTIFIER = "MISSING_FILE_IDENTIFIER"
+    INVALID_FILE_IDENTIFIER = "MISSING_FILE_IDENTIFIER"
+    INVALID_FORMAT_VERSION = "INVALID_FORMAT_VERSION"
     UNKNOWN_ERROR = "UNKNOWN_ERROR"
 
     # How?
@@ -41,9 +42,8 @@ class DBPFHeader:
     index_offset_short: int
     index_size: int
     unknown_three: bytes
-    unknown_four: int
     index_offset_long: int
-    unknown_five: bytes
+    unknown_four: bytes
 
 
 class PackageException(Exception):
@@ -97,24 +97,47 @@ class SimsPackageValidator:
             )
 
     def _parse_dbpf2_header(self, header_data: bytes) -> DBPFHeader:
-        # Unpack header data in this format:
-        # < (little endian)
-        # 4s (4 byte char, for file identifier)
-        # I (4 byte unsigned integer, for major format version)
-        # I (4 byte unsigned integer, for minor format version)
-        # I (4 byte unsigned integer, major file version, unused)
-        # I (4 byte unsigned integer, minor file version, unused)
-        # I (4 byte unsigned integer, unknown, unused)
-        # I (4 byte unsigned integer, creation time, unused)
-        # I (4 byte unsigned integer, update time, unused)
-        # I (4 byte unsigned integer, unknown, unused)
-        # I (4 byte unsigned integer, index offset, short (absolute) [1])
-        # I (4 byte unsigned integer, index size)
-        # 12s (12 byte char, unknown, unused)
-        # I (4 byte unsigned integer, unknown, unused)
-        # 2I (8 byte unsigned integer, unknown, unused)
-        values = struct.unpack("<4sIIIIIIIIII12sI2I2I", header_data)
-        return DBPFHeader(*values)
+        # Unpack header data
+        # ref: https://docs.python.org/3/library/struct.html#format-characters
+        # ref: https://thesims4moddersreference.org/reference/dbpf-format/
+        vals = struct.unpack("<4s 11I 12s I Q 24s", header_data)
+
+        (
+            file_signature,
+            major_format_version,
+            minor_format_version,
+            major_file_version,  # unused
+            minor_file_version,  # unused
+            unknown_one,  # unused
+            creation_time,  # unused
+            update_time,  # unused
+            unknown_two,  # unused
+            index_count,
+            index_offset_short,
+            index_size,
+            unknown_three,  # unused
+            unknown_four,  # unused
+            index_offset_long,
+            unknown_five,  # unused
+        ) = vals
+
+        return DBPFHeader(
+            file_signature=file_signature,
+            major_file_version=major_format_version,
+            minor_file_version=minor_format_version,
+            major_format_version=major_format_version,
+            minor_format_version=minor_format_version,
+            unknown_one=unknown_one,
+            creation_time=creation_time,
+            update_time=update_time,
+            unknown_two=unknown_two,
+            index_count=index_count,
+            index_offset_short=index_offset_short,
+            index_size=index_size,
+            unknown_three=unknown_three,
+            index_offset_long=index_offset_long,
+            unknown_four=unknown_four,
+        )
 
     def validate(self, package_file: PackageFile):
         try:
@@ -122,13 +145,22 @@ class SimsPackageValidator:
 
             with package_file.file_path.open("rb") as raw_package:
                 header_data = raw_package.read(magic.HEADER_SIZE)
-                header = self._parse_header(header_data)
+                header = self._parse_dbpf2_header(header_data)
 
                 if header.file_signature != magic.FILE_IDENTIFIER:
                     self._logger.error(
                         f"File is not a valid DBPF file: {package_file.file_path}"
                     )
-                    return ValidationError.MISSING_FILE_IDENTIFIER
+                    return ValidationError.INVALID_FILE_IDENTIFIER
+                if (
+                    header.major_format_version != magic.EXPECTED_MAJOR_FORMAT_VERSION
+                    or header.minor_format_version
+                    != magic.EXPECTED_MINOR_FORMAT_VERSION
+                ):
+                    self._logger.error(
+                        f"Invalid major/minor format version values: {package_file.file_path}"
+                    )
+                    return ValidationError.INVALID_FORMAT_VERSION
 
             self._logger.info(f"Package file is good! 😎: {package_file.file_path}")
 

@@ -4,8 +4,8 @@
 # File identifier for Sims4 .package file
 FILE_IDENTIFIER = b"DBPF"
 
-# Minimum file size for a valid Sims4 .package file (when including DBPF header)
-MIN_FILE_SIZE = 64
+HEADER_SIZE = 96
+MIN_FILE_SIZE = HEADER_SIZE
 
-EXPECTED_MAJOR_VERSION = 2
-EXPECTED_MAJOR_VERSION = 1
+EXPECTED_MAJOR_FORMAT_VERSION = 2
+EXPECTED_MINOR_FORMAT_VERSION = 1

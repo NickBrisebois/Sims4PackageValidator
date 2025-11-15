@@ -16,9 +16,19 @@ def main():
     logger = LogHandler.get_logger(__name__)
     package_validator = SimsPackageValidator(logger)
 
+    corrupted = 0
+    valid = 0
+
     for package_file in find_package_files(args.directory):
-        package_validator.validate(package_file)
-        print(package_file.file_path)
+        if error := package_validator.validate(package_file):
+            logger.error(f"Validation error for {package_file}: {error}")
+            corrupted += 1
+        else:
+            valid += 1
+            logger.info(f"Validated {package_file}")
+
+    logger.info(f"Validated {valid} packages")
+    logger.info(f"Found {corrupted} corrupted packages")
 
 
 if __name__ == "__main__":
