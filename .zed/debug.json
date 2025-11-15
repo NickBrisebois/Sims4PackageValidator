@@ -1,0 +1,11 @@
+[
+  {
+    "adapter": "Debugpy",
+    "label": "Run PackageChecker",
+    "request": "launch",
+    "python": "$ZED_CUSTOM_PYTHON_ACTIVE_ZED_TOOLCHAIN",
+    "args": ["-d", "${ZED_WORKTREE_ROOT}/_test_data/"],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "module": "$ZED_CUSTOM_PYTHON_MODULE_NAME"
+  }
+]
