@@ -1,16 +1,16 @@
-import logging
+from logging import DEBUG, Logger, StreamHandler, getLogger
 
 import colorlog
 
 
 class LogHandler:
     @classmethod
-    def get_logger(cls, name: str):
-        logger = logging.getLogger(name)
-        logger.setLevel(logging.DEBUG)
+    def get_logger(cls, name: str) -> Logger:
+        logger = getLogger(name)
+        logger.setLevel(DEBUG)
 
         formatter = colorlog.ColoredFormatter(
-            "%(log_color)s%(levelname)s:%(name)s:%(message)s%(reset)s",
+            "%(log_color)s%(levelname)s:%(name)s:: %(message)s%(reset)s",
             datefmt=None,
             reset=True,
             log_colors={
@@ -24,7 +24,7 @@ class LogHandler:
             style="%",
         )
 
-        stream_handler = logging.StreamHandler()
+        stream_handler = StreamHandler()
         stream_handler.setFormatter(formatter)
         logger.addHandler(stream_handler)
 

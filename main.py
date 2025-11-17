@@ -5,14 +5,13 @@ from pathlib import Path
 
 from files import CCType, find_cc_files, write_file_to_output
 from log_handler import LogHandler
-from validators.package_validator import SimsPackageValidator
+from validators.package_validator import Sims4PackageValidator
 from validators.ts4script_validator import TS4ScriptValidator
 
 
 def main():
-    logger = LogHandler.get_logger(__name__)
+    logger = LogHandler.get_logger("Sims4CCValidator")
 
-    # for root, subdirs, files in os.walk()
     parser = ArgumentParser(description="Package Checker")
     parser.add_argument("-d", "--directory", type=Path, help="Directory to check")
     parser.add_argument("-o", "--outdir", type=Path, help="Output directory")
@@ -43,7 +42,7 @@ def main():
     if args.skip:
         logger.info(f"Skipping validation for {args.skip}")
 
-    package_validator = SimsPackageValidator(logger)
+    package_validator = Sims4PackageValidator(logger)
     ts4cript_validator = TS4ScriptValidator(logger)
 
     validity_stats = {"corrupted": 0, "valid": 0}

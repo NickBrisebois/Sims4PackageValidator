@@ -1,12 +1,9 @@
-import struct
-from dataclasses import dataclass
 from enum import Enum
-from io import BufferedReader
 from logging import Logger
-from pathlib import Path
 
 import validators.magic_numbers.packages as magic
 from files import CCFile, CCType
+from handlers.package_handler import DBPFEntry, DBPFHeader, Sims4PackageHandler
 from validators.base_validator import BaseValidator
 
 
@@ -32,26 +29,6 @@ class ValidationError(Enum):
     UNKNOWN_ERROR = "UNKNOWN_ERROR"
 
 
-@dataclass
-class DBPFHeader:
-    file_signature: bytes
-    major_format_version: int
-    minor_format_version: int
-    major_file_version: int
-    minor_file_version: int
-    unknown_one: int
-    creation_time: int
-    update_time: int
-    unknown_two: int
-    index_count: int
-    index_offset_short: int
-    index_size: int
-    unknown_three: bytes
-    unknown_constant: int
-    index_offset_long: int
-    padding: bytes
-
-
 class PackageException(Exception):
     detail: str
     error: ValidationError
@@ -61,53 +38,11 @@ class PackageException(Exception):
         self.error = error
 
 
-class SimsPackageValidator(BaseValidator):
+class Sims4PackageValidator(BaseValidator):
     _logger: Logger
 
     def __init__(self, logger: Logger):
         self._logger = logger
-
-    def _parse_dbpf2_header(self, header_data: bytes) -> DBPFHeader:
-        # Unpack header data
-        vals = struct.unpack(magic.HEADER_STRUCT_FORMAT, header_data)
-
-        (
-            file_signature,
-            major_format_version,
-            minor_format_version,
-            major_file_version,  # unused
-            minor_file_version,  # unused
-            unknown_one,  # unused
-            creation_time,  # unused
-            update_time,  # unused
-            unknown_two,  #
-            index_count,
-            index_offset_short,
-            index_size,
-            unknown_three,  # unused
-            unknown_constant,  # unknown but always uint32 w/ val 3
-            index_offset_long,
-            padding,  # unused
-        ) = vals
-
-        return DBPFHeader(
-            file_signature=file_signature,
-            major_format_version=major_format_version,
-            minor_format_version=minor_format_version,
-            major_file_version=major_file_version,
-            minor_file_version=minor_file_version,
-            unknown_one=unknown_one,
-            creation_time=creation_time,
-            update_time=update_time,
-            unknown_two=unknown_two,
-            index_count=index_count,
-            index_offset_short=index_offset_short,
-            index_size=index_size,
-            unknown_three=unknown_three,
-            unknown_constant=unknown_constant,
-            index_offset_long=index_offset_long,
-            padding=padding,
-        )
 
     def validate_file_meta(self, package_file: CCFile) -> None:
         """
@@ -145,25 +80,26 @@ class SimsPackageValidator(BaseValidator):
                 error=error_code,
             )
 
-    def validate_header(
-        self, file_path: Path, header: DBPFHeader
-    ) -> ValidationError | None:
+    def validate_header(self, header: DBPFHeader) -> ValidationError | None:
         error_msg = None
         error_code = None
 
         if header.file_signature != magic.FILE_IDENTIFIER:
-            error_msg = f"File is not a valid DBPF file: {file_path}"
+            error_msg = "File is not a valid DBPF file"
             error_code = ValidationError.INVALID_FILE_IDENTIFIER
 
         if (
             header.major_format_version != magic.EXPECTED_MAJOR_FORMAT_VERSION
             or header.minor_format_version != magic.EXPECTED_MINOR_FORMAT_VERSION
         ):
-            error_msg = f"Invalid major/minor format version values: {file_path}"
+            error_msg = "Invalid major/minor format version values"
             error_code = ValidationError.INVALID_FORMAT_VERSION
 
-        if header.unknown_constant != magic.EXPECTED_UNKNOWN_CONSTANT:
-            error_msg = f"Invalid unknown constant value: {file_path}"
+        if (
+            header.unknown_constant_one != magic.EXPECTED_UNKNOWN_CONSTANT_ONE
+            or header.hole_offset != magic.EXPECTED_HOLE_OFFSET
+        ):
+            error_msg = "Invalid unknown constant value(s)"
             error_code = ValidationError.INVALID_UNKNOWN_CONSTANT
 
         if error_code and error_msg:
@@ -172,9 +108,9 @@ class SimsPackageValidator(BaseValidator):
                 error=error_code,
             )
 
-    def validate_index_info(
+    def validate_index_entry(
         self,
-        raw_package_data: BufferedReader,
+        index_entry: DBPFEntry,
         package_file: CCFile,
         header: DBPFHeader,
         file_size_bytes: int,
@@ -194,13 +130,14 @@ class SimsPackageValidator(BaseValidator):
             error_code = ValidationError.INDEX_OUT_OF_BOUNDS
 
         try:
-            raw_package_data.seek(header.index_offset_short)
-            index_data = raw_package_data.read(header.index_size)
+            # raw_package_data.seek(header.index_offset_short)
+            # index_data = raw_package_data.read(header.index_size)
 
-            if len(index_data) != header.index_size:
-                error_msg = f"Couldn't read complete index (expected {header.index_size} bytes, got {len(index_data)} bytes)"
-                error_code = ValidationError.INVALID_INDEX
-        except Exception as e:
+            # if len(index_data) != header.index_size:
+            #     error_msg = f"Couldn't read complete index (expected {header.index_size} bytes, got {len(index_data)} bytes)"
+            #     error_code = ValidationError.INVALID_INDEX
+            pass
+        except Exception:
             error_msg = f"Failed to parse index info: {package_file.file_path}"
             error_code = ValidationError.INDEX_PARSE_ERROR
 
@@ -212,21 +149,38 @@ class SimsPackageValidator(BaseValidator):
 
     def validate(self, package_file: CCFile):
         try:
+            self._logger.info(
+                "======================"
+                + f"Validating package: {package_file.file_path}"
+                + "======================"
+            )
+
+            self._logger.info(
+                f"[{package_file.file_name}] Validating package file metadata..."
+            )
             self.validate_file_meta(package_file)
 
-            with package_file.file_path.open("rb") as raw_package:
-                header_data = raw_package.read(magic.HEADER_SIZE)
-                header = self._parse_dbpf2_header(header_data)
+            with Sims4PackageHandler(package_file) as handler:
+                header = handler.get_header()
 
-                if error := self.validate_header(package_file.file_path, header):
+                self._logger.info(
+                    f"[{package_file.file_name}] Validating package header..."
+                )
+                if error := self.validate_header(header):
                     return error
 
-                if error := self.validate_index_info(
-                    raw_package_data=raw_package,
-                    package_file=package_file,
-                    header=header,
-                    file_size_bytes=package_file.file_size_bytes,
-                ):
+                self._logger.info(
+                    f"[{package_file.file_name}] Validating package index info..."
+                )
+                for index_entry in handler.get_entries():
+                    if error := self.validate_index_entry(
+                        index_entry=index_entry,
+                        package_file=package_file,
+                        header=header,
+                        file_size_bytes=package_file.file_size_bytes,
+                    ):
+                        return error
+
                     return error
 
             self._logger.info(f"Package file is good! 😎: {package_file.file_path}")
